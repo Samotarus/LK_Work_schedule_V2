@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -557,6 +556,19 @@
             const day = String(date.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
         }
+        
+        // Форматируем дату в строку DD-MM-YYYY
+        function formatDateToDDMMYYYY(dateStr) {
+            if (!dateStr) return '';
+            const parts = dateStr.split('-');
+            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+        
+        // Форматируем время
+        function formatTime(timeStr) {
+            return timeStr;
+        }
+        
         // Извлекаем год и месяц из строки даты YYYY-MM-DD
         function getYearMonth(dateStr) {
             if (!dateStr) return null;
@@ -1084,13 +1096,62 @@
                 group.shifts.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
                 group.shifts.forEach(shift => {
                     const coeffColor = coefficientColors[shift.durationCoefficient] || '#808080';
-                    logHtml += `
-                        <div class="shift-item mb-3 pb-3 border-b border-gray-100 last:border-0 last:mb-0 last:pb-0">
-                            <div class="flex flex-wrap items-center justify-between mb-1">
+                    const startDate = new Date(shift.startDate);
+                    const endDate = new Date(shift.endDate);
+                    const isMultiDay = shift.startDate !== shift.endDate;
+                    
+                    // Создаем HTML для отображения времени
+                    let timeHtml = '';
+                    if (isMultiDay) {
+                        // Для многострочных смен показываем каждую дату отдельно
+                        const startDateTime = new Date(`${shift.startDate}T${shift.startTime}`);
+                        const endDateTime = new Date(`${shift.endDate}T${shift.endTime}`);
+                        
+                        // Первая часть - от начала до конца дня
+                        const endOfDay = new Date(shift.startDate);
+                        endOfDay.setHours(23, 59, 59, 999);
+                        const firstDuration = (endOfDay - startDateTime) / (1000 * 60 * 60);
+                        
+                        // Вторая часть - от начала дня до окончания
+                        const startOfDay = new Date(shift.endDate);
+                        startOfDay.setHours(0, 0, 0, 0);
+                        const secondDuration = (endDateTime - startOfDay) / (1000 * 60 * 60);
+                        
+                        timeHtml = `
+                            <div class="flex flex-col">
+                                <div class="flex items-center justify-between mb-1">
+                                    <div class="font-medium text-gray-700 flex items-center">
+                                        <span class="icon-calendar"></span>${formatDateToDDMMYYYY(shift.startDate)} 
+                                        <span class="icon-clock"></span>${shift.startTime} - 23:59
+                                    </div>
+                                    <div class="text-sm text-gray-500">${firstDuration.toFixed(1)} ч</div>
+                                </div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <div class="font-medium text-gray-700 flex items-center">
+                                        <span class="icon-calendar"></span>${formatDateToDDMMYYYY(shift.endDate)} 
+                                        <span class="icon-clock"></span>00:00 - ${shift.endTime}
+                                    </div>
+                                    <div class="text-sm text-gray-500">${secondDuration.toFixed(1)} ч</div>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        // Для однодневных смен
+                        timeHtml = `
+                            <div class="flex items-center justify-between mb-1">
                                 <div class="font-medium text-gray-700">
-                                    <span class="icon-calendar"></span>${shift.startDate}
+                                    <span class="icon-calendar"></span>${formatDateToDDMMYYYY(shift.startDate)}
                                     <span class="icon-clock"></span>${shift.startTime} - ${shift.endTime}
                                 </div>
+                                <div class="text-sm text-gray-500">${shift.duration} ч</div>
+                            </div>
+                        `;
+                    }
+                    
+                    logHtml += `
+                        <div class="shift-item mb-3 pb-3 border-b border-gray-100 last:border-0 last:mb-0 last:pb-0">
+                            ${timeHtml}
+                            <div class="flex items-center justify-between mt-1">
                                 <div class="flex items-center">
                                     <span class="text-xs px-2 py-1 rounded mr-2 text-white" style="background-color: ${coeffColor}">
                                         K${shift.durationCoefficient}
@@ -1099,11 +1160,6 @@
                                         <span class="icon-ruble"></span>${shift.earnings}
                                     </span>
                                 </div>
-                            </div>
-                            <div class="text-sm text-gray-500 flex items-center justify-between">
-                                <span>
-                                    <i class="fas fa-hourglass-half mr-1"></i>${shift.duration} ч
-                                </span>
                                 <div>
                                     <button onclick="editShift(${shift.id})" class="text-blue-600 hover:text-blue-800 mr-2">
                                         <i class="fas fa-edit mr-1"></i>Ред.
@@ -1275,7 +1331,7 @@
                 return;
             }
             const dataStr = JSON.stringify(log, null, 2);
-            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const dataUri = 'application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
             const exportFileDefaultName = `shifts_export_${new Date().toISOString().slice(0,10)}.json`;
             const linkElement = document.createElement('a');
             linkElement.setAttribute('href', dataUri);
