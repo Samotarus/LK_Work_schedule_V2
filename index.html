@@ -2,10 +2,6 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval';">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Учет смен</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -171,9 +167,10 @@
             <!-- Main Content -->
             <div class="p-6">
                 <!-- Form Section -->
-                <div class="bg-gray-50 rounded-lg p-6 mb-8 border border-gray-200">
+                <div class="bg-gray-50 rounded-lg p-6 mb-8 border border-gray-200" id="formSection">
                     <h2 class="text-xl font-semibold mb-4 text-gray-700 flex items-center">
-                        <i class="fas fa-plus-circle mr-2 text-green-600"></i> Добавить новую смену
+                        <i class="fas fa-plus-circle mr-2 text-green-600"></i> 
+                        <span id="formTitle">Добавить новую смену</span>
                     </h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
@@ -622,7 +619,7 @@
             const log = JSON.parse(localStorage.getItem('shiftLog') || '[]');
             const currentYear = currentViewDate.getFullYear();
             const yearlyShifts = log.filter(entry => {
-                const entryYear = new Date(entry.startDate).getFullYear();
+                const entryYear = new Date(entry.endDate).getFullYear();
                 return entryYear === currentYear;
             });
             const totalEarnings = yearlyShifts.reduce((sum, shift) => sum + parseFloat(shift.earnings), 0);
@@ -650,21 +647,14 @@
             const shiftLog = JSON.parse(localStorage.getItem('shiftLog') || '[]');
             const currentMonthStr = getYearMonth(formatDateToYYYYMMDD(currentViewDate));
             const shiftsThisMonth = shiftLog.filter(entry => 
-                getYearMonth(entry.endDate) === currentMonthStr || 
-                getYearMonth(entry.startDate) === currentMonthStr
+                getYearMonth(entry.endDate) === currentMonthStr
             );
             const shiftsByDate = {};
             shiftsThisMonth.forEach(entry => {
-                if (!shiftsByDate[entry.startDate]) {
-                    shiftsByDate[entry.startDate] = [];
+                if (!shiftsByDate[entry.endDate]) {
+                    shiftsByDate[entry.endDate] = [];
                 }
-                shiftsByDate[entry.startDate].push(entry);
-                if (entry.startDate !== entry.endDate) {
-                    if (!shiftsByDate[entry.endDate]) {
-                        shiftsByDate[entry.endDate] = [];
-                    }
-                    shiftsByDate[entry.endDate].push(entry);
-                }
+                shiftsByDate[entry.endDate].push(entry);
             });
             // Дни предыдущего месяца
             const prevMonthLastDay = new Date(year, month - 1, 0).getDate();
@@ -887,7 +877,7 @@
             
             const log = JSON.parse(localStorage.getItem('shiftLog') || '[]');
             const filteredShifts = log.filter(entry => {
-                const entryDate = new Date(entry.startDate);
+                const entryDate = new Date(entry.endDate);
                 return entryDate >= start && entryDate <= end;
             });
             
@@ -998,6 +988,7 @@
                 log = log.map(entry => entry.id === editingId ? logEntry : entry);
                 editingId = null;
                 document.getElementById('submitButton').innerHTML = '<i class="fas fa-calculator mr-2"></i> Добавить смену и рассчитать';
+                document.getElementById('formTitle').textContent = 'Добавить новую смену';
                 showAlert('Смена успешно обновлена!', 'success');
             } else {
                 log.push(logEntry);
@@ -1078,7 +1069,7 @@
             let logHtml = `
                 <div class="flex items-center justify-between mb-6">
                     <h2 class="text-xl font-semibold text-gray-700 flex items-center">
-                        <i class="fas fa-history mr-2 text-green-600"></i> История работ за ${document.getElementById('monthDisplay').textContent}
+                        <i class="fas fa-history mr-2 text-green-600"></i> История работ
                     </h2>
                 </div>
             `;
@@ -1097,7 +1088,7 @@
                         </div>
                         <div class="work-group-details hidden bg-gray-50 p-4 border-t border-gray-200">
                 `;
-                group.shifts.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+                group.shifts.sort((a, b) => new Date(b.endDate) - new Date(a.endDate));
                 group.shifts.forEach(shift => {
                     const coeffColor = coefficientColors[shift.durationCoefficient] || '#808080';
                     const startDate = new Date(shift.startDate);
@@ -1227,7 +1218,12 @@
                 document.getElementById('baseRate').value = getBaseRate();
                 editingId = id;
                 document.getElementById('submitButton').innerHTML = '<i class="fas fa-save mr-2"></i> Сохранить изменения';
-                document.querySelector('.form').scrollIntoView({behavior: 'smooth'});
+                document.getElementById('formTitle').textContent = 'Редактирование смены';
+                
+                // Прокрутка к форме
+                document.getElementById('formSection').scrollIntoView({behavior: 'smooth'});
+                
+                showAlert('Режим редактирования', 'success');
             }
         }
         // Удаление одной смены
@@ -1310,6 +1306,7 @@
             document.getElementById('baseRate').value = getBaseRate();
             editingId = null;
             document.getElementById('submitButton').innerHTML = '<i class="fas fa-calculator mr-2"></i> Добавить смену и рассчитать';
+            document.getElementById('formTitle').textContent = 'Добавить новую смену';
         }
         // Загрузка лога
         function loadLog() {
@@ -1334,14 +1331,22 @@
                 showAlert('Нет данных для экспорта', 'error');
                 return;
             }
-            const dataStr = JSON.stringify(log, null, 2);
-            const dataUri = 'application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-            const exportFileDefaultName = `shifts_export_${new Date().toISOString().slice(0,10)}.json`;
-            const linkElement = document.createElement('a');
-            linkElement.setAttribute('href', dataUri);
-            linkElement.setAttribute('download', exportFileDefaultName);
-            linkElement.click();
-            showAlert('Данные успешно экспортированы', 'success');
+            try {
+                const dataStr = JSON.stringify(log, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `shifts_export_${new Date().toISOString().slice(0,10)}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                showAlert('Данные успешно экспортированы', 'success');
+            } catch (e) {
+                console.error('Error exporting ', e);
+                showAlert('Ошибка при экспорте данных', 'error');
+            }
         }
         // Импорт смен из файла
         function importShifts(input) {
@@ -1436,7 +1441,7 @@
             
             const log = JSON.parse(localStorage.getItem('shiftLog') || '[]');
             const filteredShifts = log.filter(entry => {
-                const entryDate = new Date(entry.startDate);
+                const entryDate = new Date(entry.endDate);
                 return entryDate >= start && entryDate <= end;
             });
             
@@ -1488,5 +1493,3 @@
 </body>
 </html>
 ```
-
-
