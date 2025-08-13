@@ -1335,28 +1335,29 @@
                 const dataStr = JSON.stringify(log, null, 2);
                 const blob = new Blob([dataStr], { type: 'application/json' });
                 
-                // Для iOS (iPhone/iPad)
+                // Создаем элемент для скачивания
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `shifts_export_${new Date().toISOString().slice(0,10)}.json`;
+                
+                // Добавляем ссылку в DOM
+                document.body.appendChild(link);
+                
+                // Для iOS устройств используем другой подход
                 if (navigator.userAgent.match(/iPad|iPhone|iPod/) && !window.MSStream) {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        const dataUri = e.target.result;
-                        const link = document.createElement('a');
-                        link.href = dataUri;
-                        link.download = `shifts_export_${new Date().toISOString().slice(0,10)}.json`;
-                        document.body.appendChild(link);
-                        link.click();
-                        setTimeout(() => {
-                            document.body.removeChild(link);
-                        }, 100);
-                    };
-                    reader.readAsDataURL(blob);
+                    // Открываем в новой вкладке для iOS
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.click();
+                    
+                    // Даем время на открытие, затем удаляем
+                    setTimeout(() => {
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                    }, 1000);
                 } else {
-                    // Для всех остальных устройств
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `shifts_export_${new Date().toISOString().slice(0,10)}.json`;
-                    document.body.appendChild(link);
+                    // Для других устройств используем стандартный способ
                     link.click();
                     document.body.removeChild(link);
                     URL.revokeObjectURL(url);
@@ -1364,7 +1365,7 @@
                 
                 showAlert('Данные успешно экспортированы', 'success');
             } catch (e) {
-                console.error('Error exporting data:', e);
+                console.error('Error exporting ', e);
                 showAlert('Ошибка при экспорте данных', 'error');
             }
         }
