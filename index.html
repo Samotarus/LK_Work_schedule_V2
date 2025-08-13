@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -1335,23 +1334,28 @@
             try {
                 const dataStr = JSON.stringify(log, null, 2);
                 const blob = new Blob([dataStr], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `shifts_export_${new Date().toISOString().slice(0,10)}.json`;
                 
-                // Для мобильных устройств используем другой подход
-                if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                    // Для мобильных устройств открываем в новом окне
-                    link.target = '_blank';
-                    document.body.appendChild(link);
-                    link.click();
-                    setTimeout(() => {
-                        document.body.removeChild(link);
-                        URL.revokeObjectURL(url);
-                    }, 100);
+                // Для iOS (iPhone/iPad)
+                if (navigator.userAgent.match(/iPad|iPhone|iPod/) && !window.MSStream) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const dataUri = e.target.result;
+                        const link = document.createElement('a');
+                        link.href = dataUri;
+                        link.download = `shifts_export_${new Date().toISOString().slice(0,10)}.json`;
+                        document.body.appendChild(link);
+                        link.click();
+                        setTimeout(() => {
+                            document.body.removeChild(link);
+                        }, 100);
+                    };
+                    reader.readAsDataURL(blob);
                 } else {
-                    // Для десктопных устройств используем стандартный способ
+                    // Для всех остальных устройств
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `shifts_export_${new Date().toISOString().slice(0,10)}.json`;
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
